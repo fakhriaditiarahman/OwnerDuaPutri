@@ -88,3 +88,13 @@ export interface PurchaseWithRelations extends Purchase {
     }
   >
 }
+
+export interface BackupData {
+  version: number
+  exported_at: string
+  products: Product[]
+  suppliers: Supplier[]
+  purchases: Purchase[]
+  purchase_items: PurchaseItem[]
+  price_history: PriceHistory[]
+}

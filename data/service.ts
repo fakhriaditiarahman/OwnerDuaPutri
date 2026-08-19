@@ -6,6 +6,8 @@ import type {
   PriceHistory,
   Product,
   ProductWithRelations,
+  Purchase,
+  PurchaseItem,
   PurchaseReport,
   PurchaseWithRelations,
   Supplier,
@@ -499,4 +501,100 @@ export async function updateSupplier(
     throw new Error(error.message)
   }
   return row
+}
+
+async function advanceSequences(): Promise<void> {
+  const { error } = await supabase.rpc("advance_sequences")
+  throwIfError(error, "Gagal menyelaraskan sequence ID")
+}
+
+export async function getFullBackup(): Promise<{
+  products: Product[]
+  suppliers: Supplier[]
+  purchases: Purchase[]
+  purchase_items: PurchaseItem[]
+  price_history: PriceHistory[]
+}> {
+  const [products, suppliers, purchases, purchase_items, price_history] = await Promise.all([
+    supabase.from("products").select("*").order("name"),
+    supabase.from("suppliers").select("*").order("name"),
+    supabase.from("purchases").select("*").order("purchase_date", { ascending: false }),
+    supabase.from("purchase_items").select("*").order("purchase_item_id"),
+    supabase.from("price_history").select("*").order("created_at", { ascending: false }),
+  ])
+
+  throwIfError(products.error, "Gagal menyiapkan backup barang")
+  throwIfError(suppliers.error, "Gagal menyiapkan backup supplier")
+  throwIfError(purchases.error, "Gagal menyiapkan backup pembelian")
+  throwIfError(purchase_items.error, "Gagal menyiapkan backup item")
+  throwIfError(price_history.error, "Gagal menyiapkan backup histori")
+
+  return {
+    products: products.data ?? [],
+    suppliers: suppliers.data ?? [],
+    purchases: purchases.data ?? [],
+    purchase_items: purchase_items.data ?? [],
+    price_history: price_history.data ?? [],
+  }
+}
+
+export interface RestoreSummary {
+  inserted: number
+}
+
+export async function restoreBackup(input: import("@/lib/types").BackupData): Promise<RestoreSummary> {
+  if (!input || typeof input !== "object") {
+    throw new Error("Format backup tidak valid")
+  }
+
+  const supplierIds = new Set(input.suppliers.map((s) => s.supplier_id))
+
+  // Produk rujukan supplier yang tak ada di backup -> null-kan agar tak melanggar FK.
+  const products = input.products.map((p) => ({
+    ...p,
+    last_supplier_id:
+      p.last_supplier_id && supplierIds.has(p.last_supplier_id) ? p.last_supplier_id : null,
+  }))
+
+  // Hindari bentrok barcode ganda di dalam backup.
+  const seenBarcodes = new Set<string>()
+  const cleanProducts = products.map((p) => {
+    if (!p.barcode) return p
+    if (seenBarcodes.has(p.barcode)) return { ...p, barcode: null }
+    seenBarcodes.add(p.barcode)
+    return p
+  })
+
+  let inserted = 0
+
+  async function upsert(table: string, rows: unknown[]) {
+    if (rows.length === 0) return
+    const { error } = await supabase.from(table).upsert(rows as never, {
+      onConflict: `${table === "price_history" ? "history_id" : table === "purchase_items" ? "purchase_item_id" : table === "purchases" ? "purchase_id" : table === "products" ? "product_id" : "supplier_id"}`,
+    })
+    if (error) {
+      // Fallback: jika bentrok barcode, ulangi tanpa barcode.
+      if (table === "products" && error.code === "23505") {
+        const { error: retry } = await supabase.from(table).upsert(
+          (rows as Array<Record<string, unknown>>).map((r) => ({ ...r, barcode: null })) as never,
+          { onConflict: "product_id" },
+        )
+        throwIfError(retry, "Gagal restore barang")
+        inserted += rows.length
+        return
+      }
+      throwIfError(error, `Gagal restore ${table}`)
+    }
+    inserted += rows.length
+  }
+
+  await upsert("suppliers", input.suppliers)
+  await upsert("products", cleanProducts)
+  await upsert("purchases", input.purchases)
+  await upsert("purchase_items", input.purchase_items)
+  await upsert("price_history", input.price_history)
+
+  await advanceSequences()
+
+  return { inserted }
 }
