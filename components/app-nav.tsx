@@ -60,7 +60,7 @@ export function AppNav() {
           })}
         </nav>
         <div className="border-t p-4 text-xs text-sidebar-foreground/50">
-          MVP · Data contoh (mock)
+          Kedai Dua Putri
         </div>
       </aside>
 

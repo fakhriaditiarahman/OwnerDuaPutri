@@ -101,6 +101,139 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 }
 
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+]
+
+const CHART_PALETTE = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
+
+export interface MonthlySpend {
+  month: string
+  total: number
+}
+
+export interface SupplierSpend {
+  key: string
+  supplier: string
+  total: number
+  fill: string
+}
+
+export interface TopProduct {
+  name: string
+  quantity: number
+}
+
+export interface DashboardStats {
+  monthly: MonthlySpend[]
+  bySupplier: SupplierSpend[]
+  topProducts: TopProduct[]
+  totalSpendThisMonth: number
+}
+
+interface StatsRow {
+  purchase_date: string
+  total_amount: number
+  supplier: { name: string } | null
+  items: Array<{ quantity: number; product: { name: string } | null }>
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const startStr = start.toISOString().slice(0, 10)
+
+  const { data, error } = await supabase
+    .from("purchases")
+    .select(
+      "purchase_date, total_amount, supplier:suppliers(name), items:purchase_items(quantity, product:products(name))",
+    )
+    .gte("purchase_date", startStr)
+    .order("purchase_date", { ascending: true })
+
+  throwIfError(error, "Gagal mengambil statistik pembelian")
+
+  const rows = (data ?? []) as unknown as StatsRow[]
+
+  const monthlyMap = new Map<string, number>()
+  const supplierMap = new Map<string, number>()
+  const productMap = new Map<string, number>()
+
+  let totalSpendThisMonth = 0
+  const monthNow = now.getMonth()
+  const yearNow = now.getFullYear()
+
+  for (const row of rows) {
+    const d = new Date(row.purchase_date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    const key = `${y}-${String(m + 1).padStart(2, "0")}`
+    monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + row.total_amount)
+
+    if (y === yearNow && m === monthNow) {
+      totalSpendThisMonth += row.total_amount
+    }
+
+    const supplierName = row.supplier?.name ?? "Tanpa Supplier"
+    supplierMap.set(supplierName, (supplierMap.get(supplierName) ?? 0) + row.total_amount)
+
+    for (const item of row.items ?? []) {
+      const productName = item.product?.name ?? "Barang"
+      productMap.set(productName, (productMap.get(productName) ?? 0) + item.quantity)
+    }
+  }
+
+  const monthly: MonthlySpend[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    monthly.push({ month: MONTH_LABELS[d.getMonth()], total: monthlyMap.get(key) ?? 0 })
+  }
+
+  const supplierEntries = [...supplierMap.entries()].sort((a, b) => b[1] - a[1])
+  const topSuppliers = supplierEntries.slice(0, 5)
+  const restSuppliers = supplierEntries.slice(5)
+  const bySupplier: SupplierSpend[] = topSuppliers.map(([supplier, total], i) => ({
+    key: `supplier-${i}`,
+    supplier,
+    total,
+    fill: CHART_PALETTE[i % CHART_PALETTE.length],
+  }))
+  if (restSuppliers.length > 0) {
+    const lainnya = restSuppliers.reduce((sum, [, t]) => sum + t, 0)
+    bySupplier.push({
+      key: "supplier-other",
+      supplier: "Lainnya",
+      total: lainnya,
+      fill: CHART_PALETTE[5 % CHART_PALETTE.length],
+    })
+  }
+
+  const topProducts: TopProduct[] = [...productMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, quantity]) => ({ name, quantity }))
+
+  return { monthly, bySupplier, topProducts, totalSpendThisMonth }
+}
+
 export async function getProducts(): Promise<Product[]> {
   const { data, error } = await supabase.from("products").select("*").order("name")
   throwIfError(error, "Gagal mengambil data barang")

@@ -1,8 +1,9 @@
 import Link from "next/link"
 import { Package, ShoppingCart, Truck, ArrowRight } from "lucide-react"
 
-import { getDashboardData, getProducts } from "@/data/service"
+import { getDashboardData, getDashboardStats, getProducts } from "@/data/service"
 import { ProductSearch } from "@/components/product-search"
+import { DashboardCharts } from "@/components/dashboard-charts"
 import {
   Card,
   CardAction,
@@ -23,7 +24,11 @@ import {
 import { formatDate, formatRupiah } from "@/lib/format"
 
 export default async function DashboardPage() {
-  const [dashboard, products] = await Promise.all([getDashboardData(), getProducts()])
+  const [dashboard, products, stats] = await Promise.all([
+    getDashboardData(),
+    getProducts(),
+    getDashboardStats(),
+  ])
 
   const summaryCards = [
     {
@@ -69,6 +74,8 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <DashboardCharts stats={stats} />
 
       <Card>
         <CardHeader>
