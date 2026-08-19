@@ -6,6 +6,8 @@ import { Search } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
+import { PaginationBar } from "@/components/ui/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import {
   Table,
   TableBody,
@@ -30,6 +32,8 @@ export function ProductList({ products }: { products: Product[] }) {
         p.barcode?.toLowerCase().includes(q),
     )
   }, [products, query])
+
+  const { page, setPage, pageCount, current } = usePagination(filtered, 10)
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,7 +61,7 @@ export function ProductList({ products }: { products: Product[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((p) => (
+            {current.map((p) => (
               <TableRow key={p.product_id}>
                 <TableCell>
                   <Link href={`/barang/${p.product_id}`} className="block hover:underline">
@@ -88,6 +92,8 @@ export function ProductList({ products }: { products: Product[] }) {
           </TableBody>
         </Table>
       </div>
+
+      <PaginationBar page={page} pageCount={pageCount} onPageChange={setPage} />
     </div>
   )
 }

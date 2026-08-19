@@ -1,0 +1,11 @@
+import { useState } from "react"
+
+export function usePagination<T>(items: T[], pageSize = 10) {
+  const [page, setPage] = useState(1)
+
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const current = items.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  return { page: safePage, setPage, pageCount, current }
+}

@@ -19,6 +19,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { PaginationBar } from "@/components/ui/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import { formatDate, formatNumber, formatRupiah } from "@/lib/format"
 import type { PurchaseWithRelations } from "@/lib/types"
 
@@ -79,6 +81,12 @@ export function ReportView({ purchases }: { purchases: PurchaseWithRelations[] }
 
   const totalAmount = filtered.reduce((s, p) => s + p.total_amount, 0)
   const supplierCount = new Set(filtered.map((p) => p.supplier_id)).size
+
+  const detailRows = filtered.flatMap((p) =>
+    p.items.map((item) => ({ ...item, purchase_id: p.purchase_id, purchase_date: p.purchase_date, supplier_name: p.supplier_name })),
+  )
+
+  const { page, setPage, pageCount, current } = usePagination(detailRows, 10)
 
   return (
     <div className="flex flex-col gap-6">
@@ -162,30 +170,28 @@ export function ReportView({ purchases }: { purchases: PurchaseWithRelations[] }
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.flatMap((p) =>
-              p.items.map((item) => (
-                <TableRow key={`${p.purchase_id}-${item.purchase_item_id}`}>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(p.purchase_date)}
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/barang/${item.product_id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {item.product_name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{p.supplier_name}</TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(item.quantity)} dus
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatRupiah(item.price_per_unit)}
-                  </TableCell>
-                </TableRow>
-              )),
-            )}
+            {current.map((row) => (
+              <TableRow key={`${row.purchase_id}-${row.purchase_item_id}`}>
+                <TableCell className="text-muted-foreground">
+                  {formatDate(row.purchase_date)}
+                </TableCell>
+                <TableCell>
+                  <Link
+                    href={`/barang/${row.product_id}`}
+                    className="font-medium hover:underline"
+                  >
+                    {row.product_name}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-muted-foreground">{row.supplier_name}</TableCell>
+                <TableCell className="text-right">
+                  {formatNumber(row.quantity)} dus
+                </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {formatRupiah(row.price_per_unit)}
+                </TableCell>
+              </TableRow>
+            ))}
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
@@ -196,6 +202,8 @@ export function ReportView({ purchases }: { purchases: PurchaseWithRelations[] }
           </TableBody>
         </Table>
       </div>
+
+      <PaginationBar page={page} pageCount={pageCount} onPageChange={setPage} />
     </div>
   )
 }

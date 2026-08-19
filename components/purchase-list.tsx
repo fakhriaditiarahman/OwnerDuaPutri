@@ -22,6 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { PaginationBar } from "@/components/ui/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import { formatDate, formatRupiah } from "@/lib/format"
 import type { PurchaseWithRelations, Supplier } from "@/lib/types"
 
@@ -53,6 +55,8 @@ export function PurchaseList({ purchases, suppliers }: Props) {
       return true
     })
   }, [purchases, query, supplierId, startDate, endDate])
+
+  const { page, setPage, pageCount, current } = usePagination(filtered, 10)
 
   const hasFilter = query || supplierId !== "all" || startDate || endDate
 
@@ -126,7 +130,7 @@ export function PurchaseList({ purchases, suppliers }: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((p) => (
+            {current.map((p) => (
               <TableRow key={p.purchase_id}>
                 <TableCell>
                   <Link
@@ -160,6 +164,8 @@ export function PurchaseList({ purchases, suppliers }: Props) {
           </TableBody>
         </Table>
       </div>
+
+      <PaginationBar page={page} pageCount={pageCount} onPageChange={setPage} />
     </div>
   )
 }
