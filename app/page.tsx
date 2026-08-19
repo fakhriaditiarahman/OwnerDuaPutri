@@ -4,6 +4,7 @@ import { Package, ShoppingCart, Truck, ArrowRight } from "lucide-react"
 import { getDashboardData, getDashboardStats, getProducts } from "@/data/service"
 import { ProductSearch } from "@/components/product-search"
 import { DashboardCharts } from "@/components/dashboard-charts"
+import { WelcomeHeader } from "@/components/welcome-header"
 import {
   Card,
   CardAction,
@@ -50,6 +51,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <WelcomeHeader />
+
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
