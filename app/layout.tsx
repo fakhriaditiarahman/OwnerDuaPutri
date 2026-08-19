@@ -13,6 +13,8 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Owner Management",
   description: "Aplikasi manajemen harga modal barang untuk owner",
